@@ -4,10 +4,11 @@
 
 **一款简洁高效的 Artgrid.io 视频批量下载工具**
 
-基于 Python + PyQt5 构建 | 支持 4K 2160p 下载 | 暗色主题界面
+基于 Python + PyQt5 构建 | 支持 4K 2160p 下载 | 故事/片段双模式解析 | 暗色主题界面
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PyQt5](https://img.shields.io/badge/PyQt5-GUI-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PyQt5/)
+[![curl_cffi](https://img.shields.io/badge/curl__cffi-Required-orange?style=flat-square)](https://pypi.org/project/curl-cffi/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Required-007808?style=flat-square&logo=ffmpeg&logoColor=white)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
@@ -25,7 +26,8 @@
   - [安装步骤](#安装步骤)
   - [运行程序](#运行程序)
 - [📖 使用说明](#-使用说明)
-  - [操作流程](#操作流程)
+  - [故事解析模式](#故事解析模式)
+  - [片段解析模式](#片段解析模式)
   - [文件保存规则](#文件保存规则)
 - [📁 项目结构](#-项目结构)
 - [🏗️ 技术架构](#️-技术架构)
@@ -34,9 +36,11 @@
   - [下载流程](#下载流程)
 - [🔧 核心模块文档](#-核心模块文档)
   - [main.py — 程序入口](#mainpy--程序入口)
-  - [core/parser.py — API 解析器](#coreparserpy--api-解析器)
+  - [core/parser.py — 故事 API 解析器](#coreparserpy--故事-api-解析器)
+  - [core/clip_parser.py — 片段 API 解析器](#coreclip_parserpy--片段-api-解析器)
   - [core/downloader.py — M3U8 下载器](#coredownloaderpy--m3u8-下载器)
   - [ui/main_window.py — 主窗口](#uimain_windowpy--主窗口)
+  - [ui/clip_widget.py — 片段解析组件](#uiclip_widgetpy--片段解析组件)
   - [ui/styles.py — 样式表](#uistylespy--样式表)
 - [📦 依赖说明](#-依赖说明)
 - [🔨 打包部署](#-打包部署)
@@ -50,7 +54,9 @@
 
 | 特性 | 描述 |
 |:-----|:-----|
-| 🔗 **URL 智能解析** | 输入 Artgrid 故事页面 URL，自动提取故事 ID 并获取所有视频片段 |
+| 📖 **故事解析** | 输入 Artgrid 故事页面 URL，自动提取故事 ID 并批量获取所有视频片段 |
+| 🎬 **片段解析** | 输入 Artgrid 单个片段 URL，直接解析并下载单个视频（使用 curl_cffi 模拟浏览器绕过反爬） |
+| 🗂️ **双标签页** | 故事解析与片段解析分标签页独立操作，互不干扰 |
 | 📥 **批量下载** | 支持一键批量下载故事中的所有视频，也可勾选部分视频下载 |
 | 🎯 **4K 超清画质** | 自动将播放列表 URL 转换为 2160p 最高画质下载链接 |
 | 🔄 **断点重试** | 每个视频分片下载失败自动重试 3 次，确保下载完整性 |
@@ -64,28 +70,34 @@
 
 ## 🖼️ 界面预览
 
-> 软件采用深蓝暗色主题设计，界面布局清晰，操作直观
+> 软件采用深蓝暗色主题设计，双标签页布局，操作直观
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  🎬 Artgrid 视频下载器                                    │
-│  输入Artgrid故事页面URL，自动提取并批量下载视频              │
+│  输入Artgrid页面URL，自动提取并下载视频                     │
 │                                                          │
-│  ┌────────────────────────────────────────┐ ┌──────────┐ │
-│  │ 请输入Artgrid故事页面URL...             │ │  解 析    │ │
-│  └────────────────────────────────────────┘ └──────────┘ │
-│                                                          │
-│  [全选] [取消全选]  共 0 个视频，已选 0 个    [下载选中]   │
-│  保存目录: D:\Artgrid下载器\downloads                     │
-│                                                          │
-│  ┌────┬────┬──────────────┬────────┬──────┬────────────┐ │
-│  │ ☑  │ 1  │ 视频名称      │ 分辨率  │ 画质 │ 标签       │ │
-│  ├────┼────┼──────────────┼────────┼──────┼────────────┤ │
-│  │ ☑  │ 2  │ Storm Sky    │3840x.. │ 2160p│ timelapse  │ │
-│  │ ☑  │ 3  │ Ocean Waves  │3840x.. │ 2160p│ ocean      │ │
-│  └────┴────┴──────────────┴────────┴──────┴────────────┘ │
-│                                                          │
-│  ████████████████████████████░░░░░░░░  75%                │
+│  ┌──────────────┐ ┌──────────────┐                       │
+│  │  故事解析      │ │  片段解析     │                       │
+│  └──────────────┘ └──────────────┘                       │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │                                                    │  │
+│  │  ┌────────────────────────────────┐ ┌──────────┐  │  │
+│  │  │ 请输入Artgrid故事/片段页面URL... │ │  解 析    │  │  │
+│  │  └────────────────────────────────┘ └──────────┘  │  │
+│  │                                                    │  │
+│  │  [全选] [取消全选]  共 0 个视频，已选 0 个 [下载选中] │  │
+│  │  保存目录: D:\Artgrid下载器\downloads               │  │
+│  │                                                    │  │
+│  │  ┌────┬────┬──────────────┬────────┬──────┬──────┐ │  │
+│  │  │ ☑  │ 1  │ 视频名称      │ 分辨率  │ 画质 │ 标签 │ │  │
+│  │  ├────┼────┼──────────────┼────────┼──────┼──────┤ │  │
+│  │  │ ☑  │ 2  │ Storm Sky    │3840x.. │ 2160p│ ..   │ │  │
+│  │  └────┴────┴──────────────┴────────┴──────┴──────┘ │  │
+│  │                                                    │  │
+│  │  ████████████████████████████░░░░░░░░  75%          │  │
+│  │                                                    │  │
+│  └────────────────────────────────────────────────────┘  │
 │                                                          │
 │  ┌──────────────────────────────────────────────────────┐ │
 │  │ [1/10] 下载中: 75% (75/100)                         │ │
@@ -116,7 +128,7 @@ git clone https://github.com/927133951/Artgrid-Downloader.git
 cd Artgrid-Downloader
 
 # 安装 Python 依赖
-pip install PyQt5 requests
+pip install PyQt5 requests curl_cffi
 ```
 
 ### 运行程序
@@ -129,37 +141,53 @@ python main.py
 
 ## 📖 使用说明
 
-### 操作流程
+软件提供两种解析模式，通过顶部标签页切换：
+
+### 故事解析模式
+
+解析整个故事页面，批量获取所有视频片段。
 
 ```
-1️⃣ 输入URL    →    2️⃣ 点击解析    →    3️⃣ 选择视频    →    4️⃣ 开始下载    →    5️⃣ 完成
+1️⃣ 切换到「故事解析」标签页
+   →
+2️⃣ 输入故事 URL（格式: https://artgrid.io/story/数字/名称）
+   →
+3️⃣ 点击「解析」
+   →
+4️⃣ 勾选需要下载的视频
+   →
+5️⃣ 点击「下载选中」
 ```
 
 <details>
 <summary>📌 详细操作步骤</summary>
 
-**1️⃣ 输入 URL**
+**1️⃣ 切换到「故事解析」标签页**
 
-在顶部输入框中粘贴 Artgrid 故事页面 URL：
+点击顶部「故事解析」标签页。
+
+**2️⃣ 输入 URL**
+
+在输入框中粘贴 Artgrid 故事页面 URL：
 
 - ✅ 正确格式：`https://artgrid.io/story/数字/名称`
 - ✅ 示例：`https://artgrid.io/story/6021181/storm-and-sky-timelapse`
 
-**2️⃣ 点击解析**
+**3️⃣ 点击解析**
 
 点击「解析」按钮，等待解析完成：
 - 解析过程中按钮显示「解析中...」并禁用
 - 日志区域实时显示解析进度
 - 解析完成后视频列表自动填充到表格中
 
-**3️⃣ 选择视频**
+**4️⃣ 选择视频**
 
 在表格中勾选需要下载的视频：
 - 默认全选
 - 可使用「全选」/「取消全选」按钮快速操作
 - 计数标签实时更新选中数量
 
-**4️⃣ 开始下载**
+**5️⃣ 开始下载**
 
 点击「下载选中」按钮：
 - 下载过程中解析按钮、下载按钮、全选按钮均禁用
@@ -167,9 +195,47 @@ python main.py
 - 日志区域实时显示每个视频的下载状态
 - 视频自动保存到程序目录下的 `downloads/` 文件夹
 
-**5️⃣ 下载完成**
+</details>
 
-日志显示成功/跳过/总计统计信息
+### 片段解析模式
+
+解析单个视频片段页面，直接下载单个视频。使用 curl_cffi 模拟浏览器请求，绕过反爬机制。
+
+```
+1️⃣ 切换到「片段解析」标签页
+   →
+2️⃣ 输入片段 URL（格式: https://artgrid.io/clip/数字/名称）
+   →
+3️⃣ 点击「解析」
+   →
+4️⃣ 点击「下载选中」
+```
+
+<details>
+<summary>📌 详细操作步骤</summary>
+
+**1️⃣ 切换到「片段解析」标签页**
+
+点击顶部「片段解析」标签页。
+
+**2️⃣ 输入 URL**
+
+在输入框中粘贴 Artgrid 片段页面 URL：
+
+- ✅ 正确格式：`https://artgrid.io/clip/数字/名称`
+- ✅ 示例：`https://artgrid.io/clip/6613774/outdoor-activity-adventure-sport`
+
+**3️⃣ 点击解析**
+
+点击「解析」按钮，程序将：
+- 提取片段 ID
+- 使用 curl_cffi 模拟 Chrome 浏览器请求 API 获取片段信息
+- 自动转换为 2160p M3U8 链接
+- 解析完成后视频信息显示在表格中
+
+**4️⃣ 开始下载**
+
+点击「下载选中」按钮，下载流程与故事解析模式一致。
 
 </details>
 
@@ -192,11 +258,13 @@ Artgrid下载器/
 │   └── icon.ico                     # 🎨 应用图标
 ├── core/
 │   ├── __init__.py
-│   ├── parser.py                    # 🔍 Artgrid API 解析器
+│   ├── parser.py                    # 🔍 故事 API 解析器（批量获取视频列表）
+│   ├── clip_parser.py               # 🎬 片段 API 解析器（单个视频解析，curl_cffi）
 │   └── downloader.py                # ⬇️ M3U8 下载器 + FFmpeg 转换
 ├── ui/
 │   ├── __init__.py
-│   ├── main_window.py               # 🖥️ 主窗口界面 + 交互逻辑
+│   ├── main_window.py               # 🖥️ 主窗口界面（标签页容器 + 故事解析）
+│   ├── clip_widget.py               # 🎬 片段解析组件（片段解析标签页）
 │   └── styles.py                    # 🎨 QSS 暗色主题样式表
 ├── downloads/                       # 📂 视频保存目录（自动创建）
 ├── temp/                            # 📂 临时文件目录（自动创建）
@@ -213,29 +281,32 @@ Artgrid下载器/
 ### 整体架构
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   main.py                        │
-│              （程序入口 + 资源加载）               │
-└──────────────────────┬──────────────────────────┘
-                       │
-          ┌────────────┴────────────┐
-          ▼                         ▼
-┌──────────────────┐    ┌──────────────────────┐
-│   ui/ 模块        │    │    core/ 模块         │
-│                   │    │                      │
-│  main_window.py   │───▶│  parser.py           │
-│  （界面 + 交互）   │    │  （API 解析）         │
-│                   │───▶│  downloader.py       │
-│  styles.py        │    │  （M3U8 下载+转换）   │
-│  （QSS 样式）     │    │                      │
-└──────────────────┘    └──────────────────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    ▼                     ▼
-            ┌──────────────┐    ┌──────────────┐
-            │  Artgrid API │    │   FFmpeg     │
-            │  （数据获取）  │    │  （格式转换） │
-            └──────────────┘    └──────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                        main.py                               │
+│                   （程序入口 + 资源加载）                      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+              ┌────────────┴────────────┐
+              ▼                         ▼
+┌────────────────────────┐    ┌──────────────────────────────┐
+│      ui/ 模块           │    │        core/ 模块             │
+│                        │    │                              │
+│  main_window.py        │───▶│  parser.py                   │
+│  （主窗口 + 故事解析）   │    │  （故事 API 解析）            │
+│                        │───▶│  clip_parser.py              │
+│  clip_widget.py        │    │  （片段 API 解析, curl_cffi） │
+│  （片段解析组件）        │───▶│  downloader.py              │
+│                        │    │  （M3U8 下载 + FFmpeg 转换）  │
+│  styles.py             │    │                              │
+│  （QSS 样式）           │    │                              │
+└────────────────────────┘    └──────────────────────────────┘
+                                       │
+                          ┌────────────┴────────────┐
+                          ▼                         ▼
+                  ┌──────────────┐          ┌──────────────┐
+                  │  Artgrid API │          │   FFmpeg     │
+                  │  （数据获取） │          │  （格式转换） │
+                  └──────────────┘          └──────────────┘
 ```
 
 ### 线程模型
@@ -243,25 +314,39 @@ Artgrid下载器/
 ```
 主线程 (UI 线程)
   │
-  ├── ParseThread (QThread) ── 解析线程
-  │     └── 调用 ArtgridParser.parse_all_clips()
-  │           └── 通过 pyqtSignal 向主线程报告进度和结果
+  ├── 故事解析标签页
+  │     ├── ParseThread (QThread) ── 故事解析线程
+  │     │     └── 调用 ArtgridParser.parse_all_clips()
+  │     │           └── 通过 pyqtSignal 向主线程报告进度和结果
+  │     │
+  │     └── DownloadThread (QThread) ── 故事下载线程
+  │           └── 调用 M3U8Downloader.download_ts()
+  │                 └── 通过 pyqtSignal 向主线程报告进度和结果
   │
-  └── DownloadThread (QThread) ── 下载线程
-        └── 调用 M3U8Downloader.download_ts()
-              └── 通过 pyqtSignal 向主线程报告进度和结果
+  └── 片段解析标签页
+        ├── ClipParseThread (QThread) ── 片段解析线程
+        │     └── 调用 ClipParser.parse_clip_url()
+        │           └── 通过 pyqtSignal 向主线程报告进度和结果
+        │
+        └── ClipDownloadThread (QThread) ── 片段下载线程
+              └── 调用 M3U8Downloader.download_ts()
+                    └── 通过 pyqtSignal 向主线程报告进度和结果
 ```
 
 | 线程 | 职责 |
 |:-----|:-----|
 | **UI 线程** | 负责界面渲染和用户交互，不执行耗时操作 |
-| **ParseThread** | 在后台执行 API 请求和数据解析，避免界面卡顿 |
-| **DownloadThread** | 在后台执行网络下载和文件转换，避免界面卡顿 |
+| **ParseThread** | 后台执行故事 API 请求和数据解析 |
+| **DownloadThread** | 后台执行故事视频下载和文件转换 |
+| **ClipParseThread** | 后台执行片段 API 请求（curl_cffi 模拟浏览器） |
+| **ClipDownloadThread** | 后台执行片段视频下载和文件转换 |
 
 ### 下载流程
 
+**故事解析下载流程：**
+
 ```
-输入 URL
+输入故事 URL
   │
   ▼
 提取故事 ID ────── 失败 ──▶ 提示 URL 格式错误
@@ -297,10 +382,25 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
   │                         所有方案失败
   │
   ▼
-清理临时文件
+清理临时文件 → 下载完成
+```
+
+**片段解析下载流程：**
+
+```
+输入片段 URL
   │
   ▼
-下载完成，报告统计结果
+提取片段 ID ────── 失败 ──▶ 提示 URL 格式错误
+  │
+  ▼
+curl_cffi 模拟浏览器请求 API（impersonate='chrome'）
+  │
+  ▼
+获取片段信息 + M3U8 链接
+  │  自动转换为 2160p 画质
+  ▼
+后续下载流程与故事模式一致
 ```
 
 ---
@@ -323,7 +423,7 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
 
 ---
 
-### core/parser.py — API 解析器
+### core/parser.py — 故事 API 解析器
 
 负责与 Artgrid 网站 API 交互，提取故事页面中的视频信息。
 
@@ -389,9 +489,81 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
 
 ---
 
+### core/clip_parser.py — 片段 API 解析器
+
+负责解析单个 Artgrid 片段页面，使用 curl_cffi 模拟浏览器请求绕过反爬机制。
+
+**类：`ClipParser`**
+
+| 常量 | 说明 |
+|:-----|:-----|
+| `API_BASE` | `https://artgrid.io/api`，Artgrid API 基础地址 |
+| `API_HEADERS` | API 请求头，包含 `searchengine` 等特殊字段 |
+| `DOWNLOAD_HEADERS` | 下载请求头，模拟 Chrome 浏览器 |
+
+<details>
+<summary>📋 方法详解</summary>
+
+#### `extract_clip_id(url)` → `str | None`
+
+从 URL 中提取片段 ID。
+
+- 正则匹配：`artgrid\.io/clip/(\d+)`
+- 示例：从 `https://artgrid.io/clip/6613774/outdoor-activity` 中提取 `6613774`
+
+#### `get_clip_info_from_api(clip_id, clip_url="")` → `dict | None`
+
+通过 API 获取片段详情。
+
+- 使用 **curl_cffi** 发送请求，`impersonate='chrome'` 模拟 Chrome 浏览器指纹
+- API 端点：`GET https://artgrid.io/api/clip/details?clipId={id}`
+- 可选传入 `clip_url` 作为 Referer
+
+#### `get_m3u8_url(clip_info)` → `str`
+
+从片段信息中获取 M3U8 播放链接。
+
+- 自动将 `_playlist_` 替换为 `_2160p_` 获取最高画质
+
+#### `parse_m3u8_segments(m3u8_url)` → `list[str]`
+
+解析 M3U8 播放列表，委托给 `M3U8Downloader.parse_m3u8_segments()`。
+
+#### `parse_clip_url(url, progress_callback=None)` → `tuple[str | None, list, dict]`
+
+**片段解析入口方法**，完整流程：
+
+1. 提取片段 ID
+2. curl_cffi 请求 API 获取片段信息
+3. 获取 M3U8 链接并转换为 2160p
+4. 解析 M3U8 分片列表（失败时尝试备用 URL）
+5. 返回 `(m3u8_url, segments, clip_info)`
+
+#### `download_segments(segments, output_path, progress_callback=None)` → `bool`
+
+**片段下载入口方法**，完整流程：
+
+1. 检查 FFmpeg
+2. 逐片下载到内存（每片重试 3 次）
+3. 写入临时 TS 文件
+4. 多重容错转换保存（FFmpeg shell → 分离进程 → 项目中转）
+5. 清理临时文件
+
+#### `generate_clip_filename(clip_info, url="")` → `str`
+
+根据片段信息生成安全的文件名。
+
+- 优先使用 `name` / `clipName` 字段
+- 若为空则从 URL 路径提取名称
+- 特殊字符替换为下划线，空名称使用 `clip_{id}` 替代
+
+</details>
+
+---
+
 ### core/downloader.py — M3U8 下载器
 
-负责视频分片下载、临时文件写入、FFmpeg 格式转换等核心下载逻辑。
+负责视频分片下载、临时文件写入、FFmpeg 格式转换等核心下载逻辑。被故事解析和片段解析共用。
 
 **类：`M3U8Downloader`**
 
@@ -488,15 +660,15 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
 
 ### ui/main_window.py — 主窗口
 
-包含所有用户交互逻辑、界面布局和事件处理。
+主窗口界面，包含标签页容器和故事解析功能。
 
 **线程类：**
 
 | 类 | 信号 | 类型 | 说明 |
 |:---|:-----|:-----|:-----|
-| `ParseThread` | `progress` | `pyqtSignal(str)` | 解析进度消息 |
-| | `finished` | `pyqtSignal(list)` | 解析完成，返回视频列表 |
-| | `error` | `pyqtSignal(str)` | 解析错误消息 |
+| `ParseThread` | `progress` | `pyqtSignal(str)` | 故事解析进度消息 |
+| | `finished` | `pyqtSignal(list)` | 故事解析完成，返回视频列表 |
+| | `error` | `pyqtSignal(str)` | 故事解析错误消息 |
 | `DownloadThread` | `progress` | `pyqtSignal(str)` | 下载进度消息 |
 | | `overall_progress` | `pyqtSignal(int)` | 总体进度百分比 |
 | | `finished` | `pyqtSignal(int, int, int)` | 下载完成 (成功数, 跳过数, 总数) |
@@ -507,15 +679,21 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
 |:-----|:-----|:-----|
 | 标题区 | QLabel | 主标题「Artgrid 视频下载器」（青绿色 22px 加粗） |
 | | QLabel | 副标题功能说明（灰色 13px） |
-| 输入区 | QLineEdit | URL 输入框，带占位提示文字 |
-| | QPushButton | 「解析」按钮，触发解析操作 |
+| 标签页 | QTabWidget | 双标签页：「故事解析」+「片段解析」 |
+| 日志区 | QTextEdit | 实时操作日志（全局共享），只读，最大高度 130px |
+
+**故事解析标签页布局：**
+
+| 区域 | 控件 | 说明 |
+|:-----|:-----|:-----|
+| 输入区 | QLineEdit | 故事 URL 输入框 |
+| | QPushButton | 「解析」按钮 |
 | 控制栏 | QPushButton | 「全选」/「取消全选」按钮 |
 | | QLabel | 视频计数显示 |
 | | QPushButton | 「下载选中」按钮 |
 | 目录显示 | QLabel | 当前视频保存路径 |
 | 视频列表 | QTableWidget | 6 列：选择 / 序号 / 视频名称 / 分辨率 / 画质 / 标签 |
 | 进度条 | QProgressBar | 下载时显示，平时隐藏 |
-| 日志区 | QTextEdit | 实时操作日志，只读，最大高度 130px |
 
 <details>
 <summary>📋 主要方法</summary>
@@ -523,6 +701,7 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
 | 方法 | 说明 |
 |:-----|:-----|
 | `init_ui()` | 初始化界面所有控件和布局 |
+| `_init_story_tab()` | 初始化故事解析标签页 |
 | `_get_icon_path()` | 获取图标路径，兼容开发/打包模式 |
 | `_get_save_dir()` | 获取视频保存目录（项目根目录/downloads/） |
 | `_update_save_dir_label()` | 更新保存目录显示标签 |
@@ -540,6 +719,57 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
 | `on_download_progress(msg)` | 下载进度消息回调 |
 | `on_overall_progress(pct)` | 总体进度更新回调 |
 | `on_download_finished(success, skip, total)` | 下载完成回调，恢复按钮状态 |
+
+</details>
+
+---
+
+### ui/clip_widget.py — 片段解析组件
+
+片段解析标签页，提供单个视频片段的解析和下载功能。
+
+**线程类：**
+
+| 类 | 信号 | 类型 | 说明 |
+|:---|:-----|:-----|:-----|
+| `ClipParseThread` | `progress` | `pyqtSignal(str)` | 片段解析进度消息 |
+| | `finished` | `pyqtSignal(list)` | 片段解析完成，返回视频列表 |
+| | `error` | `pyqtSignal(str)` | 片段解析错误消息 |
+| `ClipDownloadThread` | `progress` | `pyqtSignal(str)` | 下载进度消息 |
+| | `overall_progress` | `pyqtSignal(int)` | 总体进度百分比 |
+| | `finished` | `pyqtSignal(int, int, int)` | 下载完成 (成功数, 跳过数, 总数) |
+
+**类：`ClipWidget(QWidget)`**
+
+| 信号 | 类型 | 说明 |
+|:-----|:-----|:-----|
+| `log_signal` | `pyqtSignal(str)` | 日志消息信号，连接到主窗口的 `log()` 方法 |
+
+**界面布局与故事解析标签页一致：**
+
+URL 输入框（片段 URL）→ 解析按钮 → 控制栏 → 保存目录 → 视频列表表格 → 进度条
+
+<details>
+<summary>📋 主要方法</summary>
+
+| 方法 | 说明 |
+|:-----|:-----|
+| `init_ui()` | 初始化片段解析界面 |
+| `_get_save_dir()` | 获取视频保存目录 |
+| `_update_save_dir_label()` | 更新保存目录显示 |
+| `_update_count_label()` | 更新视频计数标签 |
+| `on_parse()` | 点击「解析」按钮，验证片段 URL 格式后启动 ClipParseThread |
+| `on_parse_finished(clips)` | 解析完成回调，填充表格 |
+| `on_parse_error(msg)` | 解析失败回调 |
+| `populate_table()` | 将视频信息填充到表格 |
+| `on_check_changed(idx, state)` | 复选框状态变更 |
+| `on_select_all()` | 全选操作 |
+| `on_deselect_all()` | 取消全选操作 |
+| `get_selected_clips()` | 获取选中的视频列表 |
+| `on_download()` | 点击「下载选中」，启动 ClipDownloadThread |
+| `on_download_progress(msg)` | 下载进度消息，通过 log_signal 转发到主窗口日志 |
+| `on_overall_progress(pct)` | 总体进度更新 |
+| `on_download_finished(success, skip, total)` | 下载完成回调 |
 
 </details>
 
@@ -572,6 +802,7 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
 - `QProgressBar`（进度条，渐变色填充）
 - `QTextEdit`（日志区域）
 - `QCheckBox`（复选框，选中时青绿色）
+- `QTabWidget#mainTab`（标签页面板、标签栏、选中/悬停状态）
 
 ---
 
@@ -582,7 +813,8 @@ FFmpeg 转换 TS→MP4 ── 失败 ──▶ 分离进程模式
 | 包名 | 用途 | 安装命令 |
 |:-----|:-----|:---------|
 | [PyQt5](https://pypi.org/project/PyQt5/) | GUI 框架，提供窗口、控件、布局等 | `pip install PyQt5` |
-| [requests](https://pypi.org/project/requests/) | HTTP 请求库，用于 API 调用和视频分片下载 | `pip install requests` |
+| [requests](https://pypi.org/project/requests/) | HTTP 请求库，用于故事 API 调用和视频分片下载 | `pip install requests` |
+| [curl_cffi](https://pypi.org/project/curl-cffi/) | 带浏览器指纹的 HTTP 请求库，用于片段 API 绕过反爬 | `pip install curl_cffi` |
 
 ### 系统依赖
 
@@ -653,13 +885,34 @@ dist/
 </details>
 
 <details>
-<summary>❓ 解析 URL 时提示「无法从 URL 中提取故事 ID」</summary>
+<summary>❓ 故事解析提示「无法从 URL 中提取故事 ID」</summary>
 
 请确认 URL 格式正确，必须包含 `artgrid.io/story/数字` 部分。
 
 - ✅ 正确：`https://artgrid.io/story/6021181/storm-and-sky-timelapse`
-- ❌ 错误：`https://artgrid.io/clip/xxxxx`
+- ❌ 错误：`https://artgrid.io/clip/xxxxx`（应使用片段解析标签页）
 - ❌ 错误：`https://artgrid.io/`
+
+</details>
+
+<details>
+<summary>❓ 片段解析提示「无法从 URL 中提取片段 ID」</summary>
+
+请确认 URL 格式正确，必须包含 `artgrid.io/clip/数字` 部分。
+
+- ✅ 正确：`https://artgrid.io/clip/6613774/outdoor-activity-adventure-sport`
+- ❌ 错误：`https://artgrid.io/story/xxxxx`（应使用故事解析标签页）
+
+</details>
+
+<details>
+<summary>❓ 片段解析获取信息失败</summary>
+
+可能原因：
+
+1. **网络问题** — 检查是否能正常访问 artgrid.io
+2. **URL 错误** — 确认片段 ID 是否有效
+3. **反爬限制** — 程序使用 curl_cffi 模拟 Chrome 浏览器，如仍被拦截可尝试更换网络环境
 
 </details>
 
@@ -706,6 +959,7 @@ dist/
 - 程序运行时会在同目录下创建 `downloads/`（视频保存）和 `temp/`（临时文件）两个文件夹
 - 建议在稳定的网络环境下使用，避免下载中断
 - 如需更改保存目录，需修改源码中 `_get_save_dir()` 方法的返回值
+- 片段解析模式使用 curl_cffi 模拟浏览器请求，需要安装 `curl_cffi` 依赖
 
 ---
 

@@ -1,8 +1,9 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QMessageBox
 from PyQt5.QtGui import QIcon
 from ui.main_window import MainWindow
+from core.ffmpeg_manager import extract_ffmpeg
 def get_resource_path(relative_path):
     if getattr(sys, 'frozen', False):
         return os.path.join(sys._MEIPASS, relative_path)
@@ -17,6 +18,11 @@ def main():
     icon_path = get_resource_path(os.path.join("assets", "icon.ico"))
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
+    ffmpeg_ok = extract_ffmpeg()
+    if not ffmpeg_ok:
+        QMessageBox.warning(None, "FFmpeg组件异常",
+            "FFmpeg组件释放失败或校验未通过，视频下载功能可能无法正常使用。\n"
+            "请尝试以管理员权限运行本程序，或重新下载完整程序包。")
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())

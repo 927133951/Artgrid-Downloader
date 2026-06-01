@@ -6,6 +6,7 @@ import sys
 import shutil
 import time
 import requests
+from core.ffmpeg_manager import get_ffmpeg_path
 class M3U8Downloader:
     HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -54,8 +55,9 @@ class M3U8Downloader:
     @staticmethod
     def check_ffmpeg():
         try:
+            ffmpeg_path = get_ffmpeg_path()
             result = subprocess.run(
-                ["ffmpeg", "-version"],
+                [ffmpeg_path, "-version"],
                 capture_output=True, text=True, timeout=10,
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 env=os.environ.copy()
@@ -172,7 +174,8 @@ class M3U8Downloader:
     @staticmethod
     def ffmpeg_convert_shell(temp_ts_path, output_path, progress_callback=None):
         try:
-            cmd = f'ffmpeg -y -i "{temp_ts_path}" -c copy -movflags +faststart -bsf:a aac_adtstoasc "{output_path}"'
+            ffmpeg_path = get_ffmpeg_path()
+            cmd = f'"{ffmpeg_path}" -y -i "{temp_ts_path}" -c copy -movflags +faststart -bsf:a aac_adtstoasc "{output_path}"'
             result = subprocess.run(
                 cmd, shell=True,
                 capture_output=True, text=True, timeout=300,
@@ -194,9 +197,10 @@ class M3U8Downloader:
     @staticmethod
     def ffmpeg_convert_detached(temp_ts_path, output_path, progress_callback=None):
         try:
+            ffmpeg_path = get_ffmpeg_path()
             DETACHED = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
             cmd = [
-                "ffmpeg", "-y",
+                ffmpeg_path, "-y",
                 "-i", temp_ts_path,
                 "-c", "copy",
                 "-movflags", "+faststart",
